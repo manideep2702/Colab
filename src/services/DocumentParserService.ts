@@ -1,8 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Configure worker for Vite
-// using a CDN for the worker to avoid complex bundler configuration issues
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+// Configure worker for Vite - use legacy build for better compatibility
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
 
 // Types for parsed content
 export interface ParsedQuestion {
@@ -46,7 +45,20 @@ export interface ParsedAssessment {
 export const extractTextFromPDF = async (file: File): Promise<string> => {
     try {
         const arrayBuffer = await file.arrayBuffer();
-        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        
+        // Check if it's actually a PDF
+        const uint8Array = new Uint8Array(arrayBuffer);
+        const header = String.fromCharCode(...uint8Array.slice(0, 5));
+        if (!header.startsWith('%PDF')) {
+            throw new Error('File does not appear to be a valid PDF');
+        }
+
+        const loadingTask = pdfjsLib.getDocument({ 
+            data: arrayBuffer,
+            useSystemFonts: true,
+            disableFontFace: false
+        });
+        
         const pdf = await loadingTask.promise;
         let fullText = '';
 
@@ -58,35 +70,54 @@ export const extractTextFromPDF = async (file: File): Promise<string> => {
             fullText += pageText + '\n\n';
         }
 
+        if (!fullText.trim()) {
+            throw new Error('Could not extract text from PDF. The PDF may be image-based or protected.');
+        }
+
         return fullText;
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error extracting text from PDF:', error);
-        throw new Error('Failed to read PDF file. Please ensure it is a valid PDF.');
+        if (error.message?.includes('Worker')) {
+            throw new Error('PDF worker failed to load. Please try again or use a JSON file instead.');
+        }
+        throw new Error(error.message || 'Failed to read PDF file. Please ensure it is a valid PDF.');
     }
 };
 
 // Parse assessment document using Regex or JSON (Client-Side)
 export const parseAssessmentDocument = async (file: File): Promise<ParsedAssessment> => {
-    if (file.type === 'application/json' || file.name.endsWith('.json')) {
-        const text = await file.text();
-        const json = JSON.parse(text);
+    // Check file type - be explicit about JSON vs PDF
+    const isJsonFile = file.type === 'application/json' || file.name.toLowerCase().endsWith('.json');
+    const isPdfFile = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    
+    if (isJsonFile) {
+        try {
+            const text = await file.text();
+            const json = JSON.parse(text);
 
-        if (!json.questions || !Array.isArray(json.questions)) {
-            throw new Error('Invalid JSON: Must contain "questions" array.');
+            if (!json.questions || !Array.isArray(json.questions)) {
+                throw new Error('Invalid JSON: Must contain "questions" array.');
+            }
+
+            return {
+                title: json.title || 'Imported Assessment',
+                description: json.description,
+                timeLimit: json.timeLimit || 30,
+                passingScore: json.passingScore || 70,
+                questions: json.questions.map((q: any) => ({
+                    question: q.question,
+                    options: q.options || [],
+                    correctAnswer: q.correctAnswer || 'A',
+                    difficulty: q.difficulty || 'medium'
+                }))
+            };
+        } catch (error: any) {
+            throw new Error(`Failed to parse JSON file: ${error.message}`);
         }
+    }
 
-        return {
-            title: json.title || 'Imported Assessment',
-            description: json.description,
-            timeLimit: json.timeLimit || 30,
-            passingScore: json.passingScore || 70,
-            questions: json.questions.map((q: any) => ({
-                question: q.question,
-                options: q.options || [],
-                correctAnswer: q.correctAnswer || 'A',
-                difficulty: q.difficulty || 'medium'
-            }))
-        };
+    if (!isPdfFile) {
+        throw new Error('Unsupported file type. Please upload a PDF or JSON file.');
     }
 
     const text = await extractTextFromPDF(file);
@@ -223,27 +254,39 @@ export const parseAssessmentDocument = async (file: File): Promise<ParsedAssessm
 
 // Parse coding challenge document using Regex or JSON (Client-Side)
 export const parseCodingChallengeDocument = async (file: File): Promise<ParsedCodingChallenge> => {
-    if (file.type === 'application/json' || file.name.endsWith('.json')) {
-        const text = await file.text();
-        const json = JSON.parse(text);
+    // Check file type - be explicit about JSON vs PDF
+    const isJsonFile = file.type === 'application/json' || file.name.toLowerCase().endsWith('.json');
+    const isPdfFile = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    
+    if (isJsonFile) {
+        try {
+            const text = await file.text();
+            const json = JSON.parse(text);
 
-        return {
-            title: json.title || 'Untitled Challenge',
-            description: json.description || '',
-            constraints: json.constraints || 'Time Limit: 1s',
-            difficulty: json.difficulty || 'medium',
-            testCases: (json.testCases || []).map((tc: any) => ({
-                input: tc.input || '',
-                expectedOutput: tc.expectedOutput || '',
-                explanation: tc.explanation,
-                isHidden: tc.isHidden || false
-            })),
-            starterCode: json.starterCode || {
-                python: '# Your code here\n',
-                javascript: '// Your code here\n'
-            },
-            points: json.points || 100
-        };
+            return {
+                title: json.title || 'Untitled Challenge',
+                description: json.description || '',
+                constraints: json.constraints || 'Time Limit: 1s',
+                difficulty: json.difficulty || 'medium',
+                testCases: (json.testCases || []).map((tc: any) => ({
+                    input: tc.input || '',
+                    expectedOutput: tc.expectedOutput || '',
+                    explanation: tc.explanation,
+                    isHidden: tc.isHidden || false
+                })),
+                starterCode: json.starterCode || {
+                    python: '# Your code here\n',
+                    javascript: '// Your code here\n'
+                },
+                points: json.points || 100
+            };
+        } catch (error: any) {
+            throw new Error(`Failed to parse JSON file: ${error.message}`);
+        }
+    }
+
+    if (!isPdfFile) {
+        throw new Error('Unsupported file type. Please upload a PDF or JSON file.');
     }
 
     const text = await extractTextFromPDF(file);
@@ -309,8 +352,11 @@ export const parseCodingChallengeDocument = async (file: File): Promise<ParsedCo
 
 // Utility to detect document type based on content
 export const detectDocumentType = async (file: File): Promise<'assessment' | 'coding' | 'unknown'> => {
+    const isJsonFile = file.type === 'application/json' || file.name.toLowerCase().endsWith('.json');
+    const isPdfFile = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    
     try {
-        if (file.type === 'application/json' || file.name.endsWith('.json')) {
+        if (isJsonFile) {
             const text = await file.text();
             const json = JSON.parse(text);
             if (json.questions && Array.isArray(json.questions)) return 'assessment';
@@ -318,11 +364,13 @@ export const detectDocumentType = async (file: File): Promise<'assessment' | 'co
             return 'unknown';
         }
 
-        const text = await extractTextFromPDF(file);
+        if (isPdfFile) {
+            const text = await extractTextFromPDF(file);
 
-        // Simple keywords check
-        if (text.match(/\d+[\.\)]\s+/)) return 'assessment'; // Has numbered list
-        if (text.toLowerCase().includes('input format') || text.toLowerCase().includes('output format')) return 'coding';
+            // Simple keywords check
+            if (text.match(/\d+[\.\)]\s+/)) return 'assessment'; // Has numbered list
+            if (text.toLowerCase().includes('input format') || text.toLowerCase().includes('output format')) return 'coding';
+        }
 
         return 'unknown';
     } catch {
