@@ -711,9 +711,10 @@ export const AssessmentsPage: React.FC = () => {
                 starter_code: { python: "def solution():\n    pass" }
             });
             setTestCases([]);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating coding challenge:', error);
-            alert('Failed to create coding challenge');
+            const errorMessage = error?.message || error?.error_description || 'Unknown error';
+            alert(`Failed to create coding challenge: ${errorMessage}`);
         } finally {
             setIsSubmitting(false);
         }

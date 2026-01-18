@@ -601,13 +601,17 @@ export const codingChallengeService = {
     },
 
     create: async (challenge: Partial<CodingChallenge>): Promise<CodingChallenge> => {
+        console.log('Creating coding challenge with data:', challenge);
         const { data, error } = await supabase
             .from('coding_challenges')
             .insert(challenge)
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            console.error('Supabase error creating challenge:', error);
+            throw new Error(error.message || 'Database error');
+        }
         return data;
     },
 
@@ -634,13 +638,17 @@ export const codingChallengeService = {
 
     // Test Cases Management
     addTestCase: async (testCase: Partial<ChallengeTestCase>): Promise<ChallengeTestCase> => {
+        console.log('Adding test case:', testCase);
         const { data, error } = await supabase
             .from('challenge_test_cases')
             .insert(testCase)
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            console.error('Supabase error adding test case:', error);
+            throw new Error(error.message || 'Failed to add test case');
+        }
         return data;
     },
 
