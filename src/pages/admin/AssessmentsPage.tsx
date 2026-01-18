@@ -824,7 +824,7 @@ export const AssessmentsPage: React.FC = () => {
                 type: 'mcq' as const,
                 content: q.question,
                 options: q.options.map(opt => opt.text),
-                correct_answer: q.options.findIndex(opt => opt.key === q.correctAnswer).toString(),
+                correct_answer: q.options.find(opt => opt.key === q.correctAnswer)?.text || '',
                 points: 10,
             }));
 

@@ -58,11 +58,16 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         e.preventDefault();
         setIsDragging(false);
         const droppedFile = e.dataTransfer.files[0];
-        if (droppedFile && (droppedFile.type === 'application/pdf' || droppedFile.name.endsWith('.pdf'))) {
+        if (droppedFile && (
+            droppedFile.type === 'application/pdf' ||
+            droppedFile.name.endsWith('.pdf') ||
+            droppedFile.type === 'application/json' ||
+            droppedFile.name.endsWith('.json')
+        )) {
             setFile(droppedFile);
             setError('');
         } else {
-            setError('Please upload a PDF file');
+            setError('Please upload a PDF or JSON file');
         }
     }, []);
 
@@ -97,14 +102,6 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         }
     };
 
-    const handleImport = () => {
-        if (parsedData) {
-            onImport(parsedData);
-            handleReset();
-            onClose();
-        }
-    };
-
     const handleReset = () => {
         setFile(null);
         setStatus('idle');
@@ -113,49 +110,56 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         setExpandedQuestions(new Set());
     };
 
-    const toggleQuestion = (index: number) => {
-        const newExpanded = new Set(expandedQuestions);
-        if (newExpanded.has(index)) {
-            newExpanded.delete(index);
-        } else {
-            newExpanded.add(index);
+    const handleImport = () => {
+        if (parsedData) {
+            onImport(parsedData);
+            onClose();
         }
-        setExpandedQuestions(newExpanded);
     };
 
-    // Edit handlers for assessment questions
-    const updateQuestion = (index: number, field: keyof ParsedQuestion, value: any) => {
-        if (parsedData && 'questions' in parsedData) {
-            const newQuestions = [...parsedData.questions];
-            newQuestions[index] = { ...newQuestions[index], [field]: value };
-            setParsedData({ ...parsedData, questions: newQuestions });
-        }
+    const toggleQuestion = (index: number) => {
+        setExpandedQuestions(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(index)) {
+                newSet.delete(index);
+            } else {
+                newSet.add(index);
+            }
+            return newSet;
+        });
     };
 
     const deleteQuestion = (index: number) => {
         if (parsedData && 'questions' in parsedData) {
-            const newQuestions = parsedData.questions.filter((_, i) => i !== index);
-            setParsedData({ ...parsedData, questions: newQuestions });
+            const updated = {
+                ...parsedData,
+                questions: parsedData.questions.filter((_, i) => i !== index)
+            };
+            setParsedData(updated);
         }
     };
 
-    // Edit handlers for coding challenge test cases
     const updateTestCase = (index: number, field: keyof ParsedTestCase, value: any) => {
         if (parsedData && 'testCases' in parsedData) {
-            const newTestCases = [...parsedData.testCases];
-            newTestCases[index] = { ...newTestCases[index], [field]: value };
-            setParsedData({ ...parsedData, testCases: newTestCases });
+            const updated = {
+                ...parsedData,
+                testCases: parsedData.testCases.map((tc, i) =>
+                    i === index ? { ...tc, [field]: value } : tc
+                )
+            };
+            setParsedData(updated);
         }
     };
 
     const deleteTestCase = (index: number) => {
         if (parsedData && 'testCases' in parsedData) {
-            const newTestCases = parsedData.testCases.filter((_, i) => i !== index);
-            setParsedData({ ...parsedData, testCases: newTestCases });
+            const updated = {
+                ...parsedData,
+                testCases: parsedData.testCases.filter((_, i) => i !== index)
+            };
+            setParsedData(updated);
         }
     };
-
-    if (!isOpen) return null;
 
     return (
         <AnimatePresence>
@@ -180,7 +184,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                                 Import {type === 'assessment' ? 'Assessment' : 'Coding Challenge'}
                             </h2>
                             <p className="text-sm text-zinc-500 mt-1">
-                                Upload a PDF document to extract {type === 'assessment' ? 'questions' : 'problem details'}
+                                Upload a PDF or JSON file to import {type === 'assessment' ? 'questions' : 'problem details'}
                             </p>
                         </div>
                         <button
@@ -229,7 +233,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                                             <Upload className="w-12 h-12 text-zinc-500" />
                                             <div>
                                                 <p className="text-white font-medium">
-                                                    Drag and drop your PDF here
+                                                    Drag and drop PDF or JSON here
                                                 </p>
                                                 <p className="text-sm text-zinc-500 mt-1">
                                                     or click to browse
@@ -237,7 +241,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                                             </div>
                                             <input
                                                 type="file"
-                                                accept=".pdf,application/pdf"
+                                                accept=".pdf,application/pdf,.json,application/json"
                                                 onChange={handleFileSelect}
                                                 className="absolute inset-0 opacity-0 cursor-pointer"
                                             />
@@ -258,11 +262,25 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                             <div className="flex flex-col items-center justify-center py-12 gap-4">
                                 <Loader2 className="w-12 h-12 text-indigo-500 animate-spin" />
                                 <div className="text-center">
-                                    <p className="text-white font-medium">Analyzing document with AI...</p>
+                                    <p className="text-white font-medium">Parsing document locally...</p>
                                     <p className="text-sm text-zinc-500 mt-1">
-                                        This may take a few seconds
+                                        Extracting text and identifying patterns
                                     </p>
                                 </div>
+                            </div>
+                        )}
+
+                        {status === 'idle' && !file && (
+                            <div className="mt-6 p-4 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-left">
+                                <h4 className="text-sm font-bold text-indigo-400 mb-2 flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4" />
+                                    Format Requirements
+                                </h4>
+                                <ul className="text-xs text-zinc-400 space-y-1 list-disc list-inside">
+                                    <li>Questions must be numbered (e.g., "1. Question text")</li>
+                                    <li>Options must start with letters (e.g., "A. Option")</li>
+                                    <li>Answers can be marked as "Answer: A"</li>
+                                </ul>
                             </div>
                         )}
 
