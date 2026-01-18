@@ -11,7 +11,9 @@ import {
     ChevronUp,
     Edit2,
     Trash2,
-    Plus
+    Plus,
+    Code,
+    FileUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -43,6 +45,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     const [parsedData, setParsedData] = useState<ParsedAssessment | ParsedCodingChallenge | null>(null);
     const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set());
     const [isDragging, setIsDragging] = useState(false);
+    const [inputMode, setInputMode] = useState<'upload' | 'paste'>('upload');
+    const [jsonText, setJsonText] = useState('');
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -108,6 +112,69 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         setError('');
         setParsedData(null);
         setExpandedQuestions(new Set());
+        setJsonText('');
+    };
+
+    const handleParseJson = async () => {
+        if (!jsonText.trim()) {
+            setError('Please paste JSON content');
+            return;
+        }
+
+        setStatus('parsing');
+        setError('');
+
+        try {
+            const json = JSON.parse(jsonText);
+
+            if (type === 'assessment') {
+                if (!json.questions || !Array.isArray(json.questions)) {
+                    throw new Error('Invalid JSON: Must contain "questions" array.');
+                }
+
+                const result: ParsedAssessment = {
+                    title: json.title || 'Imported Assessment',
+                    description: json.description,
+                    timeLimit: json.timeLimit || 30,
+                    passingScore: json.passingScore || 70,
+                    questions: json.questions.map((q: any) => ({
+                        question: q.question,
+                        options: q.options || [],
+                        correctAnswer: q.correctAnswer || 'A',
+                        difficulty: q.difficulty || 'medium'
+                    }))
+                };
+                setParsedData(result);
+            } else {
+                const result: ParsedCodingChallenge = {
+                    title: json.title || 'Untitled Challenge',
+                    description: json.description || '',
+                    constraints: json.constraints || 'Time Limit: 1s',
+                    difficulty: json.difficulty || 'medium',
+                    testCases: (json.testCases || []).map((tc: any) => ({
+                        input: tc.input || '',
+                        expectedOutput: tc.expectedOutput || '',
+                        explanation: tc.explanation,
+                        isHidden: tc.isHidden || false
+                    })),
+                    starterCode: json.starterCode || {
+                        python: '# Your code here\n',
+                        javascript: '// Your code here\n'
+                    },
+                    points: json.points || 100
+                };
+                setParsedData(result);
+            }
+
+            setStatus('success');
+        } catch (err: any) {
+            if (err instanceof SyntaxError) {
+                setError('Invalid JSON format. Please check your syntax.');
+            } else {
+                setError(err.message || 'Failed to parse JSON');
+            }
+            setStatus('error');
+        }
     };
 
     const handleImport = () => {
@@ -184,7 +251,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                                 Import {type === 'assessment' ? 'Assessment' : 'Coding Challenge'}
                             </h2>
                             <p className="text-sm text-zinc-500 mt-1">
-                                Upload a PDF or JSON file to import {type === 'assessment' ? 'questions' : 'problem details'}
+                                Upload a file or paste JSON to import {type === 'assessment' ? 'questions' : 'problem details'}
                             </p>
                         </div>
                         <button
@@ -199,55 +266,121 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                     <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
                         {status === 'idle' && (
                             <>
-                                {/* Drop Zone */}
-                                <div
-                                    onDragOver={handleDragOver}
-                                    onDragLeave={handleDragLeave}
-                                    onDrop={handleDrop}
-                                    className={cn(
-                                        "border-2 border-dashed rounded-xl p-8 text-center transition-all",
-                                        isDragging
-                                            ? "border-indigo-500 bg-indigo-500/10"
-                                            : "border-zinc-700 hover:border-zinc-600",
-                                        file && "border-emerald-500 bg-emerald-500/10"
-                                    )}
-                                >
-                                    {file ? (
-                                        <div className="flex flex-col items-center gap-3">
-                                            <FileText className="w-12 h-12 text-emerald-400" />
-                                            <div>
-                                                <p className="text-white font-medium">{file.name}</p>
-                                                <p className="text-sm text-zinc-500">
-                                                    {(file.size / 1024).toFixed(1)} KB
-                                                </p>
-                                            </div>
-                                            <button
-                                                onClick={() => setFile(null)}
-                                                className="text-sm text-red-400 hover:text-red-300 transition-colors"
-                                            >
-                                                Remove file
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center gap-3">
-                                            <Upload className="w-12 h-12 text-zinc-500" />
-                                            <div>
-                                                <p className="text-white font-medium">
-                                                    Drag and drop PDF or JSON here
-                                                </p>
-                                                <p className="text-sm text-zinc-500 mt-1">
-                                                    or click to browse
-                                                </p>
-                                            </div>
-                                            <input
-                                                type="file"
-                                                accept=".pdf,application/pdf,.json,application/json"
-                                                onChange={handleFileSelect}
-                                                className="absolute inset-0 opacity-0 cursor-pointer"
-                                            />
-                                        </div>
-                                    )}
+                                {/* Input Mode Tabs */}
+                                <div className="flex gap-2 mb-6">
+                                    <button
+                                        onClick={() => { setInputMode('upload'); setError(''); }}
+                                        className={cn(
+                                            "flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all",
+                                            inputMode === 'upload'
+                                                ? "bg-indigo-600 text-white"
+                                                : "bg-white/5 text-zinc-400 hover:bg-white/10"
+                                        )}
+                                    >
+                                        <FileUp className="w-4 h-4" />
+                                        Upload File
+                                    </button>
+                                    <button
+                                        onClick={() => { setInputMode('paste'); setError(''); setFile(null); }}
+                                        className={cn(
+                                            "flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all",
+                                            inputMode === 'paste'
+                                                ? "bg-indigo-600 text-white"
+                                                : "bg-white/5 text-zinc-400 hover:bg-white/10"
+                                        )}
+                                    >
+                                        <Code className="w-4 h-4" />
+                                        Paste JSON
+                                    </button>
                                 </div>
+
+                                {/* Upload Mode */}
+                                {inputMode === 'upload' && (
+                                    <div
+                                        onDragOver={handleDragOver}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={handleDrop}
+                                        className={cn(
+                                            "border-2 border-dashed rounded-xl p-8 text-center transition-all relative",
+                                            isDragging
+                                                ? "border-indigo-500 bg-indigo-500/10"
+                                                : "border-zinc-700 hover:border-zinc-600",
+                                            file && "border-emerald-500 bg-emerald-500/10"
+                                        )}
+                                    >
+                                        {file ? (
+                                            <div className="flex flex-col items-center gap-3">
+                                                <FileText className="w-12 h-12 text-emerald-400" />
+                                                <div>
+                                                    <p className="text-white font-medium">{file.name}</p>
+                                                    <p className="text-sm text-zinc-500">
+                                                        {(file.size / 1024).toFixed(1)} KB
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={() => setFile(null)}
+                                                    className="text-sm text-red-400 hover:text-red-300 transition-colors"
+                                                >
+                                                    Remove file
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center gap-3">
+                                                <Upload className="w-12 h-12 text-zinc-500" />
+                                                <div>
+                                                    <p className="text-white font-medium">
+                                                        Drag and drop PDF or JSON here
+                                                    </p>
+                                                    <p className="text-sm text-zinc-500 mt-1">
+                                                        or click to browse
+                                                    </p>
+                                                </div>
+                                                <input
+                                                    type="file"
+                                                    accept=".pdf,application/pdf,.json,application/json"
+                                                    onChange={handleFileSelect}
+                                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Paste JSON Mode */}
+                                {inputMode === 'paste' && (
+                                    <div className="space-y-4">
+                                        <textarea
+                                            value={jsonText}
+                                            onChange={(e) => setJsonText(e.target.value)}
+                                            placeholder={type === 'assessment' ? `{
+  "title": "My Assessment",
+  "questions": [
+    {
+      "question": "What is 2 + 2?",
+      "options": [
+        {"key": "A", "text": "3"},
+        {"key": "B", "text": "4"},
+        {"key": "C", "text": "5"},
+        {"key": "D", "text": "6"}
+      ],
+      "correctAnswer": "B",
+      "difficulty": "easy"
+    }
+  ]
+}` : `{
+  "title": "Two Sum",
+  "description": "Find two numbers that add up to target",
+  "testCases": [
+    {"input": "[2,7,11,15]\\n9", "expectedOutput": "[0,1]", "isHidden": false}
+  ]
+}`}
+                                            className="w-full h-64 px-4 py-3 bg-black/50 border border-white/10 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-indigo-500 resize-none"
+                                        />
+                                        <p className="text-xs text-zinc-500">
+                                            Paste your JSON data above. The format should match the placeholder example.
+                                        </p>
+                                    </div>
+                                )}
 
                                 {error && (
                                     <div className="mt-4 p-4 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-3">
@@ -487,13 +620,24 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                             {status === 'success' ? 'Start Over' : 'Cancel'}
                         </button>
                         <div className="flex items-center gap-3">
-                            {status === 'idle' && file && (
+                            {/* Upload mode - Extract button */}
+                            {status === 'idle' && inputMode === 'upload' && file && (
                                 <button
                                     onClick={handleParse}
                                     className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
                                 >
                                     <FileText className="w-4 h-4" />
                                     Extract Content
+                                </button>
+                            )}
+                            {/* Paste mode - Parse button */}
+                            {status === 'idle' && inputMode === 'paste' && jsonText.trim() && (
+                                <button
+                                    onClick={handleParseJson}
+                                    className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                                >
+                                    <Code className="w-4 h-4" />
+                                    Parse JSON
                                 </button>
                             )}
                             {status === 'success' && (
