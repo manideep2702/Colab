@@ -52,6 +52,8 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
             passed: boolean;
             error?: string;
         }[];
+        passedCount: number;
+        totalCount: number;
     } | null>(null);
     const [showSubmissionModal, setShowSubmissionModal] = useState(false);
 
@@ -150,12 +152,35 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
         setShowSubmissionModal(true);
 
         try {
+            // Convert testCases to the format expected by runTestCases
+            const formattedTestCases = testCases.map((tc, idx) => ({
+                id: tc.id || `tc_${idx}`,
+                input: tc.input || '',
+                expected_output: tc.expected_output || '',
+                is_hidden: tc.is_hidden,
+            }));
+            
             // Run code against all test cases
-            const results = await codeExecutionService.runTestCases(language, code, testCases);
-            setSubmissionResult(results);
+            const apiResults = await codeExecutionService.runTestCases(code, language, formattedTestCases);
+            
+            // Convert to the format expected by our UI
+            const convertedResults = {
+                passed: apiResults.overall_status === 'accepted',
+                passedCount: apiResults.passed_tests,
+                totalCount: apiResults.total_tests,
+                results: apiResults.results.map(r => ({
+                    input: formattedTestCases.find(tc => tc.id === r.test_case_id)?.input || '',
+                    expected: r.expected_output,
+                    actual: r.actual_output,
+                    passed: r.passed,
+                    error: r.error,
+                })),
+            };
+            
+            setSubmissionResult(convertedResults);
 
             if (onSubmit) {
-                await onSubmit(code, language, results.passed);
+                await onSubmit(code, language, convertedResults.passed);
             }
         } catch (err) {
             console.error(err);

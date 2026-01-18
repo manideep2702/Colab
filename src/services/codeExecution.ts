@@ -4,13 +4,21 @@
 const PISTON_API_URL = 'https://emkc.org/api/v2/piston';
 
 // Types for CodePlayground compatibility
-export type SupportedLanguage = 'python' | 'javascript' | 'java' | 'cpp' | 'c' | 'sql';
+export type SupportedLanguage = 'python' | 'javascript' | 'typescript' | 'java' | 'cpp' | 'c' | 'go' | 'rust' | 'sql';
 
 export interface CodeExecutionResult {
     output: string;
     error?: string;
     executionTime: number;
     exitCode?: number;
+    language?: string;
+    version?: string;
+    // For Terminal.tsx compatibility
+    run: {
+        stdout: string;
+        stderr: string;
+        code: number;
+    };
 }
 
 export const LANGUAGE_SNIPPETS: Record<SupportedLanguage, string> = {
@@ -25,6 +33,14 @@ data = sys.stdin.read().strip()
 print(solution())`,
     javascript: `// JavaScript Solution
 function solution() {
+    // Your code here
+    return null;
+}
+
+const data = require('fs').readFileSync('/dev/stdin', 'utf8').trim();
+console.log(solution());`,
+    typescript: `// TypeScript Solution
+function solution(): any {
     // Your code here
     return null;
 }
@@ -51,6 +67,18 @@ int main() {
 int main() {
     // Your code here
     return 0;
+}`,
+    go: `package main
+
+import "fmt"
+
+func main() {
+    // Your code here
+    fmt.Println("Hello, World!")
+}`,
+    rust: `fn main() {
+    // Your code here
+    println!("Hello, World!");
 }`,
     sql: `-- SQL Query
 SELECT * FROM table_name;`,
@@ -127,17 +155,23 @@ export interface SubmissionResult {
 const LANGUAGE_VERSIONS: Record<string, string> = {
     python: '3.10.0',
     javascript: '18.15.0',
+    typescript: '5.0.3',
     java: '15.0.2',
     cpp: '10.2.0',
     c: '10.2.0',
+    go: '1.16.2',
+    rust: '1.68.2',
 };
 
 const LANGUAGE_IDS: Record<string, string> = {
     python: 'python',
     javascript: 'javascript',
+    typescript: 'typescript',
     java: 'java',
     cpp: 'cpp',
     c: 'c',
+    go: 'go',
+    rust: 'rust',
 };
 
 export const codeExecutionService = {
@@ -150,6 +184,8 @@ export const codeExecutionService = {
         stdin: string = ''
     ): Promise<CodeExecutionResult> => {
         const startTime = Date.now();
+        const langId = LANGUAGE_IDS[language] || 'python';
+        const langVersion = LANGUAGE_VERSIONS[language] || '3.10.0';
         
         try {
             const response = await fetch(`${PISTON_API_URL}/execute`, {
@@ -158,8 +194,8 @@ export const codeExecutionService = {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    language: LANGUAGE_IDS[language] || 'python',
-                    version: LANGUAGE_VERSIONS[language] || '3.10.0',
+                    language: langId,
+                    version: langVersion,
                     files: [
                         {
                             name: getFileName(language),
@@ -184,20 +220,43 @@ export const codeExecutionService = {
                     error: data.compile.stderr || 'Compilation error',
                     executionTime,
                     exitCode: data.compile.code,
+                    language: langId,
+                    version: langVersion,
+                    run: {
+                        stdout: '',
+                        stderr: data.compile.stderr || 'Compilation error',
+                        code: data.compile.code,
+                    },
                 };
             }
 
             return {
-                output: data.run.stdout?.trim() || '',
-                error: data.run.stderr || undefined,
+                output: data.run?.stdout?.trim() || '',
+                error: data.run?.stderr || undefined,
                 executionTime,
-                exitCode: data.run.code,
+                exitCode: data.run?.code || 0,
+                language: langId,
+                version: langVersion,
+                run: {
+                    stdout: data.run?.stdout || '',
+                    stderr: data.run?.stderr || '',
+                    code: data.run?.code || 0,
+                },
             };
         } catch (error) {
+            const executionTime = Date.now() - startTime;
+            const errorMsg = error instanceof Error ? error.message : 'Execution failed';
             return {
                 output: '',
-                error: error instanceof Error ? error.message : 'Execution failed',
-                executionTime: Date.now() - startTime,
+                error: errorMsg,
+                executionTime,
+                language: langId,
+                version: langVersion,
+                run: {
+                    stdout: '',
+                    stderr: errorMsg,
+                    code: 1,
+                },
             };
         }
     },
@@ -432,9 +491,12 @@ function getFileName(language: string): string {
     const extensions: Record<string, string> = {
         python: 'main.py',
         javascript: 'main.js',
+        typescript: 'main.ts',
         java: 'Main.java',
         cpp: 'main.cpp',
         c: 'main.c',
+        go: 'main.go',
+        rust: 'main.rs',
     };
     return extensions[language] || 'main.py';
 }

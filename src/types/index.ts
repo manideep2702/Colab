@@ -145,6 +145,10 @@ export interface CodingSubmission {
     score: number;
     status: 'pending' | 'passed' | 'failed';
     submitted_at: string;
+    execution_time?: number;
+    // Joined properties
+    student?: User;
+    challenge?: CodingChallenge;
 }
 
 // Project Types
