@@ -154,7 +154,7 @@ const CodingQuestionView = ({
 
     const handleRun = async () => {
         if (!visibleTestCases[selectedTestCase]) return;
-        
+
         setIsRunning(true);
         setActiveTab('output');
         setRunResult(null);
@@ -215,7 +215,7 @@ const CodingQuestionView = ({
                 <div className="flex items-center gap-2">
                     <Badge variant="primary" size="sm">{language.toUpperCase()}</Badge>
                     {submissionResult && (
-                        <Badge 
+                        <Badge
                             variant={submissionResult.overall_status === 'accepted' ? 'success' : 'danger'}
                             size="sm"
                         >
@@ -339,8 +339,8 @@ const CodingQuestionView = ({
                                 <div className="space-y-2">
                                     <div className={cn(
                                         "p-3 rounded-lg",
-                                        submissionResult.overall_status === 'accepted' 
-                                            ? "bg-emerald-500/10 border border-emerald-500/20" 
+                                        submissionResult.overall_status === 'accepted'
+                                            ? "bg-emerald-500/10 border border-emerald-500/20"
                                             : "bg-red-500/10 border border-red-500/20"
                                     )}>
                                         <div className="flex items-center gap-2">
@@ -353,8 +353,8 @@ const CodingQuestionView = ({
                                                 "font-bold",
                                                 submissionResult.overall_status === 'accepted' ? "text-emerald-400" : "text-red-400"
                                             )}>
-                                                {submissionResult.overall_status === 'accepted' ? 'All Tests Passed!' : 
-                                                 submissionResult.overall_status.replace('_', ' ').toUpperCase()}
+                                                {submissionResult.overall_status === 'accepted' ? 'All Tests Passed!' :
+                                                    submissionResult.overall_status.replace('_', ' ').toUpperCase()}
                                             </span>
                                             <span className="text-gray-400 text-sm ml-auto">
                                                 {submissionResult.passed_tests}/{submissionResult.total_tests} passed ({submissionResult.score}%)
@@ -437,7 +437,7 @@ const ChallengeCodeEditor = ({
 }) => {
     // Determine initial language
     const initialLanguage: SupportedLanguage = (previousSubmission?.language as SupportedLanguage) || 'python';
-    
+
     // Use previous code if reviewing a submission, or get starter code for language
     const getStarterCode = (lang: SupportedLanguage): string => {
         if (previousSubmission?.code) return previousSubmission.code;
@@ -446,7 +446,7 @@ const ChallengeCodeEditor = ({
         }
         return LANGUAGE_SNIPPETS[lang] || LANGUAGE_SNIPPETS['python'];
     };
-    
+
     const [code, setCode] = useState<string>(getStarterCode(initialLanguage));
     const [language, setLanguage] = useState<SupportedLanguage>(initialLanguage);
     const [isRunning, setIsRunning] = useState(false);
@@ -460,7 +460,7 @@ const ChallengeCodeEditor = ({
 
     // Use provided visible test cases for display, or filter from all test cases
     const visibleTestCases = visibleTestCasesProp || testCases.filter(tc => !tc.is_hidden);
-    
+
     // All test cases (including hidden) for submission
     const allTestCases = testCases;
 
@@ -480,7 +480,7 @@ const ChallengeCodeEditor = ({
             }));
 
             console.log(`Running ${formattedTestCases.length} test cases (${formattedTestCases.filter(tc => tc.is_hidden).length} hidden)`);
-            
+
             const result = await codeExecutionService.runTestCases(code, language, formattedTestCases);
             setSubmissionResult(result);
         } catch (error) {
@@ -495,7 +495,7 @@ const ChallengeCodeEditor = ({
         if (!submissionResult) {
             await handleRun();
         }
-        
+
         setIsSubmitting(true);
         setActiveTab('output');
 
@@ -507,10 +507,10 @@ const ChallengeCodeEditor = ({
                 expected_output: tc.expected_output || '',
                 is_hidden: tc.is_hidden,
             }));
-            
+
             const result = await codeExecutionService.runTestCases(code, language, formattedTestCases);
             setSubmissionResult(result);
-            
+
             // Get AI feedback for improvements
             let aiFeedback = null;
             try {
@@ -518,10 +518,10 @@ const ChallengeCodeEditor = ({
             } catch (e) {
                 console.log('AI feedback unavailable');
             }
-            
+
             setAiFeedback(aiFeedback);
             setIsSubmitted(true);
-            
+
             if (onSubmit) {
                 await onSubmit(code, language, result.overall_status === 'accepted', result.passed_tests);
             }
@@ -531,12 +531,12 @@ const ChallengeCodeEditor = ({
             setIsSubmitting(false);
         }
     };
-    
+
     // AI Feedback generator
     const generateAIFeedback = async (code: string, lang: string, result: SubmissionResult): Promise<AICodeFeedback> => {
         const GEMINI_API_KEY = 'AIzaSyC_kXHb3WddEkUOMz01ClNDisMd83IeDAs';
         const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
-        
+
         const prompt = `You are a coding mentor. Analyze this ${lang} code submission and provide constructive feedback.
 
 Code:
@@ -569,12 +569,12 @@ Provide feedback in this JSON format ONLY (no markdown):
         });
 
         if (!response.ok) throw new Error('AI unavailable');
-        
+
         const data = await response.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error('Invalid response');
-        
+
         return JSON.parse(jsonMatch[0]);
     };
 
@@ -669,7 +669,7 @@ Provide feedback in this JSON format ONLY (no markdown):
                         >
                             Output
                             {submissionResult && (
-                                <Badge 
+                                <Badge
                                     variant={submissionResult.overall_status === 'accepted' ? 'success' : 'danger'}
                                     size="sm"
                                     className="ml-2"
@@ -726,8 +726,8 @@ Provide feedback in this JSON format ONLY (no markdown):
                                         {/* Score Header */}
                                         <div className={cn(
                                             "p-4 rounded-xl",
-                                            submissionResult.overall_status === 'accepted' 
-                                                ? "bg-emerald-500/10 border border-emerald-500/20" 
+                                            submissionResult.overall_status === 'accepted'
+                                                ? "bg-emerald-500/10 border border-emerald-500/20"
                                                 : "bg-red-500/10 border border-red-500/20"
                                         )}>
                                             <div className="flex items-center gap-2">
@@ -760,16 +760,16 @@ Provide feedback in this JSON format ONLY (no markdown):
                                                     <Sparkles className="w-5 h-5 text-indigo-400" />
                                                     <h4 className="font-bold text-white">AI Feedback</h4>
                                                 </div>
-                                                
+
                                                 <p className="text-gray-300 text-sm">{aiFeedback.summary}</p>
-                                                
+
                                                 {aiFeedback.timeComplexity && (
                                                     <div className="flex gap-4 text-xs">
                                                         <span className="text-gray-400">Time: <span className="text-white">{aiFeedback.timeComplexity}</span></span>
                                                         <span className="text-gray-400">Space: <span className="text-white">{aiFeedback.spaceComplexity}</span></span>
                                                     </div>
                                                 )}
-                                                
+
                                                 {aiFeedback.strengths.length > 0 && (
                                                     <div>
                                                         <p className="text-xs font-bold text-emerald-400 mb-1">✓ Strengths</p>
@@ -780,7 +780,7 @@ Provide feedback in this JSON format ONLY (no markdown):
                                                         </ul>
                                                     </div>
                                                 )}
-                                                
+
                                                 {aiFeedback.improvements.length > 0 && (
                                                     <div>
                                                         <p className="text-xs font-bold text-amber-400 mb-1">↑ Improvements</p>
@@ -791,7 +791,7 @@ Provide feedback in this JSON format ONLY (no markdown):
                                                         </ul>
                                                     </div>
                                                 )}
-                                                
+
                                                 {aiFeedback.tips.length > 0 && (
                                                     <div>
                                                         <p className="text-xs font-bold text-blue-400 mb-1">💡 Tips</p>
@@ -804,7 +804,7 @@ Provide feedback in this JSON format ONLY (no markdown):
                                                 )}
                                             </div>
                                         )}
-                                        
+
                                         {isSubmitting && (
                                             <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center gap-3">
                                                 <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
@@ -819,7 +819,7 @@ Provide feedback in this JSON format ONLY (no markdown):
                                                 // Check if this test case is hidden
                                                 const testCase = allTestCases.find(tc => tc.id === r.test_case_id || `tc_${allTestCases.indexOf(tc)}` === r.test_case_id);
                                                 const isHidden = testCase?.is_hidden;
-                                                
+
                                                 return (
                                                     <div key={r.test_case_id} className={cn(
                                                         "flex items-center justify-between p-3 rounded-lg",
@@ -1315,7 +1315,7 @@ export const StudentAssessmentsPage: React.FC = () => {
         try {
             const testsPassed = passedCount ?? (passed ? allChallengeTestCases.length : 0);
             const score = Math.round((testsPassed / allChallengeTestCases.length) * (selectedChallenge.points || 100));
-            
+
             // Save submission to database
             await codingChallengeService.submit({
                 challenge_id: selectedChallenge.id,
@@ -1330,7 +1330,7 @@ export const StudentAssessmentsPage: React.FC = () => {
 
             // Mark as submitted in current session
             setChallengeSubmittedNow(true);
-            
+
             // Refresh submissions to update list
             fetchData();
         } catch (error) {
@@ -1796,7 +1796,7 @@ export const StudentAssessmentsPage: React.FC = () => {
                                         medium: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
                                         hard: 'bg-red-500/20 text-red-400 border-red-500/30'
                                     };
-                                    
+
                                     // Check if this challenge has been completed
                                     const submission = getCodingSubmission(challenge.id);
                                     const isCompleted = !!submission;
@@ -1811,9 +1811,9 @@ export const StudentAssessmentsPage: React.FC = () => {
                                         >
                                             <Card variant="default" padding="md" className={cn(
                                                 "hover:ring-1 transition-all cursor-pointer group",
-                                                isCompleted 
-                                                    ? isPassed 
-                                                        ? "ring-1 ring-emerald-500/30 hover:ring-emerald-500/50" 
+                                                isCompleted
+                                                    ? isPassed
+                                                        ? "ring-1 ring-emerald-500/30 hover:ring-emerald-500/50"
                                                         : "ring-1 ring-amber-500/30 hover:ring-amber-500/50"
                                                     : "hover:ring-indigo-500/50"
                                             )}>
@@ -1826,11 +1826,11 @@ export const StudentAssessmentsPage: React.FC = () => {
                                                             {challenge.difficulty || 'medium'}
                                                         </Badge>
                                                         {isCompleted && (
-                                                            <Badge 
-                                                                className={isPassed 
-                                                                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" 
+                                                            <Badge
+                                                                className={isPassed
+                                                                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
                                                                     : "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                                                                } 
+                                                                }
                                                                 size="sm"
                                                             >
                                                                 {isPassed ? (
@@ -1968,7 +1968,7 @@ export const StudentAssessmentsPage: React.FC = () => {
                                 </Card>
 
                                 {/* Code Editor with Test Cases */}
-                                <ChallengeCodeEditor 
+                                <ChallengeCodeEditor
                                     challenge={selectedChallenge}
                                     testCases={allChallengeTestCases.length > 0 ? allChallengeTestCases : challengeTestCases}
                                     visibleTestCases={challengeTestCases}
@@ -1978,9 +1978,15 @@ export const StudentAssessmentsPage: React.FC = () => {
                                 />
                             </div>
                         ) : (
-                            <div className="text-center py-12 text-gray-500">
-                                <Code2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                                <p>Select a challenge to start coding</p>
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <Code2 className="w-6 h-6 text-indigo-400" />
+                                    <div>
+                                        <h2 className="text-lg font-semibold text-white">Practice Playground</h2>
+                                        <p className="text-sm text-gray-400">Write and run code freely - no test cases, just practice!</p>
+                                    </div>
+                                </div>
+                                <CodePlayground mode="playground" />
                             </div>
                         )}
                     </motion.div>

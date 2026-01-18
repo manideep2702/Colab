@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -8,7 +8,7 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
     children: React.ReactNode;
 }
 
-export const Card: React.FC<CardProps> = ({
+export const Card: React.FC<CardProps> = memo(({
     variant = 'default',
     padding = 'md',
     className,
@@ -21,7 +21,7 @@ export const Card: React.FC<CardProps> = ({
         default: 'bg-gray-900/50 border border-gray-800',
         glass: 'glass',
         gradient: 'bg-gradient-to-br from-gray-900/80 to-gray-900/40 border border-gray-800/50',
-        hover: 'bg-gray-900/50 border border-gray-800 hover:border-primary-500/50 hover:bg-gray-800/50 transition-all duration-300',
+        hover: 'bg-gray-900/50 border border-gray-800 hover:border-primary-500/50 hover:bg-gray-800/50 transition-colors duration-200',
     };
 
     const paddings = {
@@ -34,12 +34,13 @@ export const Card: React.FC<CardProps> = ({
     return (
         <div
             className={cn(baseStyles, variants[variant], paddings[padding], className)}
+            style={{ willChange: 'auto' }}
             {...props}
         >
             {children}
         </div>
     );
-};
+});
 
 interface AnimatedCardProps extends CardProps {
     delay?: number;

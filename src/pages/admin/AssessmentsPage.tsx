@@ -27,11 +27,14 @@ import {
     Users,
     Trophy,
     XCircle,
+    Upload,
 } from 'lucide-react';
 import { cn, formatDate, getModuleColor, formatRelativeTime } from '@/lib/utils';
 import { assessmentService, codingChallengeService } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import type { Assessment, AssessmentType, CurriculumModule, Question, CodingChallenge, ChallengeTestCase, CodingSubmission } from '@/types';
+import { DocumentUploadModal } from '@/components/admin/DocumentUploadModal';
+import type { ParsedAssessment, ParsedCodingChallenge } from '@/services/DocumentParserService';
 
 // Modal Component
 const Modal = ({ isOpen, onClose, title, children, size = 'md' }: { isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl' }) => (
@@ -136,7 +139,7 @@ const QuestionBuilder = ({
     const updateTestCase = (questionId: string, testCaseId: string, updates: Partial<TestCase>) => {
         const question = questions.find(q => q.id === questionId);
         if (question && question.test_cases) {
-            const newTestCases = question.test_cases.map(tc => 
+            const newTestCases = question.test_cases.map(tc =>
                 (tc as any).id === testCaseId ? { ...tc, ...updates } : tc
             );
             updateQuestion(questionId, { test_cases: newTestCases as any });
@@ -204,8 +207,8 @@ const QuestionBuilder = ({
                             onClick={() => addQuestion(type)}
                             className={cn(
                                 "flex items-center gap-2 px-3 py-2 border rounded-lg text-sm transition-colors",
-                                type === 'coding' 
-                                    ? "bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20 text-emerald-400" 
+                                type === 'coding'
+                                    ? "bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20 text-emerald-400"
                                     : "bg-white/5 hover:bg-white/10 border-white/10 text-gray-300"
                             )}
                         >
@@ -399,7 +402,7 @@ const QuestionBuilder = ({
                                                     <Plus className="w-3 h-3" /> Add Test Case
                                                 </button>
                                             </div>
-                                            
+
                                             <div className="space-y-3">
                                                 {(question.test_cases || []).map((tc: any, tcIndex: number) => (
                                                     <div key={tc.id} className="p-4 bg-black/30 border border-white/10 rounded-xl space-y-3">
@@ -427,7 +430,7 @@ const QuestionBuilder = ({
                                                                 )}
                                                             </div>
                                                         </div>
-                                                        
+
                                                         <div>
                                                             <label className="block text-xs text-gray-500 mb-1">Description (optional)</label>
                                                             <input
@@ -571,6 +574,9 @@ export const AssessmentsPage: React.FC = () => {
         starter_code: { python: "def solution():\n    pass" }
     });
     const [testCases, setTestCases] = useState<Partial<ChallengeTestCase>[]>([]);
+
+    // Import modal state
+    const [showImportModal, setShowImportModal] = useState(false);
 
 
     useEffect(() => {
@@ -797,6 +803,57 @@ export const AssessmentsPage: React.FC = () => {
             setCodingSubmissions([]);
         } finally {
             setIsLoadingSubmissions(false);
+        }
+    };
+
+    // Handle imported document data
+    const handleImportDocument = (data: ParsedAssessment | ParsedCodingChallenge) => {
+        if (activeTab === 'quizzes' && 'questions' in data) {
+            // Populate assessment form with imported data
+            setNewAssessment({
+                ...newAssessment,
+                title: data.title,
+                description: data.description || '',
+                time_limit: data.timeLimit || 30,
+                passing_score: data.passingScore || 70,
+            });
+
+            // Convert parsed questions to the format expected by the form
+            const convertedQuestions: Question[] = data.questions.map((q, index) => ({
+                id: `imported-${index}-${Date.now()}`,
+                type: 'mcq' as const,
+                content: q.question,
+                options: q.options.map(opt => opt.text),
+                correct_answer: q.options.findIndex(opt => opt.key === q.correctAnswer).toString(),
+                points: 10,
+            }));
+
+            setQuestions(convertedQuestions);
+            setCreateStep('questions');
+            setShowCreateModal(true);
+        } else if (activeTab === 'coding' && 'testCases' in data) {
+            // Populate coding challenge form with imported data
+            setNewChallenge({
+                ...newChallenge,
+                title: data.title,
+                description: data.description,
+                constraints: data.constraints,
+                difficulty: data.difficulty,
+                points: data.points || 100,
+                starter_code: data.starterCode || { python: "def solution():\n    pass" },
+            });
+
+            // Convert test cases
+            const convertedTestCases: Partial<ChallengeTestCase>[] = data.testCases.map((tc, index) => ({
+                id: `imported-${index}-${Date.now()}`,
+                input: tc.input,
+                expected_output: tc.expectedOutput,
+                is_hidden: tc.isHidden,
+                description: tc.explanation || '',
+            }));
+
+            setTestCases(convertedTestCases);
+            setShowCreateChallengeModal(true);
         }
     };
 
@@ -1485,13 +1542,31 @@ export const AssessmentsPage: React.FC = () => {
                         Coding Contests
                     </button>
                 </div>
-                <Button
-                    leftIcon={<Plus className="w-4 h-4" />}
-                    onClick={() => activeTab === 'quizzes' ? setShowCreateModal(true) : setShowCreateChallengeModal(true)}
-                >
-                    Create {activeTab === 'quizzes' ? 'Quiz' : 'Challenge'}
-                </Button>
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="ghost"
+                        leftIcon={<Upload className="w-4 h-4" />}
+                        onClick={() => setShowImportModal(true)}
+                        className="bg-white/5 border border-white/10 hover:bg-white/10"
+                    >
+                        Import from File
+                    </Button>
+                    <Button
+                        leftIcon={<Plus className="w-4 h-4" />}
+                        onClick={() => activeTab === 'quizzes' ? setShowCreateModal(true) : setShowCreateChallengeModal(true)}
+                    >
+                        Create {activeTab === 'quizzes' ? 'Quiz' : 'Challenge'}
+                    </Button>
+                </div>
             </div>
+
+            {/* Import Document Modal */}
+            <DocumentUploadModal
+                isOpen={showImportModal}
+                onClose={() => setShowImportModal(false)}
+                type={activeTab === 'quizzes' ? 'assessment' : 'coding'}
+                onImport={handleImportDocument}
+            />
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

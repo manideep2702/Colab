@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useCallback } from 'react';
 import { NavLink, useLocation, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -41,7 +41,7 @@ const studentNavItems = [
     { icon: Settings2, label: 'Settings', path: '/student/settings' },
 ];
 
-export const Sidebar: React.FC = () => {
+export const Sidebar: React.FC = memo(() => {
     const { user, logout } = useAuthStore();
     const { sidebarOpen, sidebarCollapsed, toggleSidebarCollapse, setSidebarOpen } = useUIStore();
     const location = useLocation();
@@ -157,8 +157,9 @@ export const Sidebar: React.FC = () => {
                                             <motion.div
                                                 layoutId="activeNav"
                                                 className="absolute inset-x-0 inset-y-0 rounded-xl bg-white/5 border border-white/5"
+                                                style={{ willChange: 'transform' }}
                                                 initial={false}
-                                                transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                                                transition={{ type: 'spring', stiffness: 300, damping: 35, mass: 0.8 }}
                                             />
                                         )}
                                         <item.icon className={cn(
@@ -207,4 +208,6 @@ export const Sidebar: React.FC = () => {
             </motion.aside>
         </>
     );
-};
+});
+
+Sidebar.displayName = 'Sidebar';

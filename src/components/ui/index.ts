@@ -4,4 +4,5 @@ export { Card, AnimatedCard, CardHeader, CardTitle, CardDescription, CardContent
 export { Badge } from './Badge';
 export { Avatar, AvatarGroup } from './Avatar';
 export { Progress, CircularProgress } from './Progress';
-export { LineChart, BarChart } from './Charts';
+export { LineChart, BarChart, HeatmapChart } from './Charts';
+export { VideoPlayerModal } from './VideoPlayerModal';

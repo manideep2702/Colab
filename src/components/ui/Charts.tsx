@@ -18,7 +18,7 @@ export const LineChart: React.FC<ChartProps> = ({ data, labels, color = '#6366f1
             </div>
         );
     }
-    
+
     const max = Math.max(...data, 100);
     const min = 0;
     const range = max - min || 1; // Prevent division by zero
@@ -119,10 +119,10 @@ export const BarChart: React.FC<ChartProps> = ({ data, labels, color = '#10b981'
             </div>
         );
     }
-    
+
     // Check if all values are zero
     const allZero = data.every(v => v === 0);
-    
+
     return (
         <div className={`w-full ${className}`} style={{ height }}>
             <div className="h-full flex items-end justify-between gap-2">
@@ -144,6 +144,66 @@ export const BarChart: React.FC<ChartProps> = ({ data, labels, color = '#10b981'
                         <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider truncate w-full text-center">
                             {labels[i]}
                         </span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+export const HeatmapChart: React.FC<{ data: { x: string; y: string; value: number }[]; height?: number; className?: string }> = ({ data, height = 300, className }) => {
+    // Basic heatmap implementation
+    // Assuming data is for a standard grid like Days x Hours or similar
+    // For this generalized version, we'll assume a 7x5ish grid or auto-detect based on unique X and Y
+
+    const uniqueX = Array.from(new Set(data.map(d => d.x)));
+    const uniqueY = Array.from(new Set(data.map(d => d.y)));
+
+    const getIntensityColor = (value: number) => {
+        // Simple scale from 0 to 100
+        if (value === 0) return 'bg-zinc-900';
+        if (value < 20) return 'bg-indigo-900/40';
+        if (value < 40) return 'bg-indigo-800/60';
+        if (value < 60) return 'bg-indigo-600/80';
+        if (value < 80) return 'bg-indigo-500';
+        return 'bg-indigo-400';
+    };
+
+    return (
+        <div className={`w-full ${className} flex flex-col`} style={{ height }}>
+            {/* Header X-Axis */}
+            <div className="flex ml-12 mb-2">
+                {uniqueX.map((x, i) => (
+                    <div key={i} className="flex-1 text-center text-[10px] text-zinc-500 font-medium uppercase tracking-wider">
+                        {x}
+                    </div>
+                ))}
+            </div>
+
+            <div className="flex-1 flex flex-col justify-between">
+                {uniqueY.map((y, rowIdx) => (
+                    <div key={rowIdx} className="flex items-center flex-1 gap-1">
+                        {/* Y-Axis Label */}
+                        <div className="w-12 text-right pr-2 text-[10px] text-zinc-500 font-medium">{y}</div>
+
+                        {/* Grid Cells */}
+                        {uniqueX.map((x, colIdx) => {
+                            const point = data.find(d => d.x === x && d.y === y);
+                            const value = point ? point.value : 0;
+                            return (
+                                <motion.div
+                                    key={`${x}-${y}`}
+                                    className={`flex-1 h-full rounded-sm min-h-[20px] ${getIntensityColor(value)} border border-black/20 group relative cursor-pointer`}
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: (rowIdx * uniqueX.length + colIdx) * 0.02 }}
+                                >
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none whitespace-nowrap border border-white/10">
+                                        {value} students
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
                     </div>
                 ))}
             </div>

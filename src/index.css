@@ -25,6 +25,7 @@ html {
   font-family: var(--font-sans);
   scroll-behavior: smooth;
   background-color: var(--bg-main);
+  -webkit-overflow-scrolling: touch;
 }
 
 body {
@@ -33,6 +34,29 @@ body {
   background-color: var(--bg-main);
   color: var(--text-main);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* GPU Acceleration for smooth animations */
+*,
+*::before,
+*::after {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ===== Typography Hierarchy ===== */
@@ -82,6 +106,7 @@ h4 {
 
 .text-gradient {
   background: linear-gradient(135deg, #FFF 0%, #9494B8 100%);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

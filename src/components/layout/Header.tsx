@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -11,13 +11,12 @@ import {
     Search,
     LogOut,
     ChevronDown,
-    Sun,
-    Moon,
+    CheckCircle2,
 } from 'lucide-react';
 
-export const Header: React.FC = () => {
+export const Header: React.FC = memo(() => {
     const { user, logout } = useAuthStore();
-    const { sidebarCollapsed, toggleSidebar, theme, setTheme } = useUIStore();
+    const { sidebarCollapsed, toggleSidebar } = useUIStore();
     const navigate = useNavigate();
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
@@ -27,14 +26,26 @@ export const Header: React.FC = () => {
         navigate('/');
     };
 
-    // Mock notifications
-    const notifications = [
+    // Notifications state
+    const [notifications, setNotifications] = useState([
         { id: 1, title: 'New Assessment Available', message: 'Python Week 2 Quiz is now available', time: '5m ago', unread: true },
         { id: 2, title: 'Project Deadline', message: 'ML Project due in 2 days', time: '1h ago', unread: true },
         { id: 3, title: 'Live Class Starting', message: 'Deep Learning basics starts in 30 min', time: '2h ago', unread: false },
-    ];
+    ]);
 
     const unreadCount = notifications.filter(n => n.unread).length;
+
+    const handleMarkAsRead = (notificationId: number) => {
+        setNotifications(prev =>
+            prev.map(n => n.id === notificationId ? { ...n, unread: false } : n)
+        );
+    };
+
+    const handleMarkAllAsRead = () => {
+        setNotifications(prev =>
+            prev.map(n => ({ ...n, unread: false }))
+        );
+    };
 
     return (
         <header
@@ -69,13 +80,7 @@ export const Header: React.FC = () => {
 
                 {/* Right Section */}
                 <div className="flex items-center gap-3">
-                    {/* Theme Toggle */}
-                    <button
-                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                        className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-                    >
-                        {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                    </button>
+
 
                     {/* Notifications */}
                     <div className="relative">
@@ -110,12 +115,12 @@ export const Header: React.FC = () => {
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="max-h-80 overflow-y-auto">
+                                        <div className="max-h-80 overflow-y-auto custom-scrollbar">
                                             {notifications.map((notification) => (
                                                 <div
                                                     key={notification.id}
                                                     className={cn(
-                                                        'p-4 hover:bg-gray-800/50 transition-colors cursor-pointer border-b border-gray-800/50 last:border-0',
+                                                        'p-4 hover:bg-gray-800/50 transition-colors border-b border-gray-800/50 last:border-0 group',
                                                         notification.unread && 'bg-primary-500/5'
                                                     )}
                                                 >
@@ -123,18 +128,44 @@ export const Header: React.FC = () => {
                                                         {notification.unread && (
                                                             <span className="w-2 h-2 bg-primary-500 rounded-full mt-2 flex-shrink-0" />
                                                         )}
-                                                        <div className={cn(!notification.unread && 'ml-5')}>
+                                                        <div className={cn('flex-1', !notification.unread && 'ml-5')}>
                                                             <p className="text-sm font-medium text-white">{notification.title}</p>
                                                             <p className="text-xs text-gray-400 mt-0.5">{notification.message}</p>
                                                             <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
                                                         </div>
+                                                        {notification.unread && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleMarkAsRead(notification.id);
+                                                                }}
+                                                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-gray-700 rounded text-xs text-gray-400 hover:text-white"
+                                                                title="Mark as read"
+                                                            >
+                                                                <CheckCircle2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
+                                            {notifications.length === 0 && (
+                                                <div className="p-8 text-center text-gray-500">
+                                                    <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                                    <p className="text-sm">No notifications</p>
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="p-3 border-t border-gray-800">
-                                            <button className="w-full text-center text-sm text-primary-400 hover:text-primary-300 transition-colors">
-                                                View all notifications
+                                        <div className="p-3 border-t border-gray-800 flex gap-2">
+                                            {unreadCount > 0 && (
+                                                <button
+                                                    onClick={handleMarkAllAsRead}
+                                                    className="flex-1 text-center text-sm text-gray-400 hover:text-white transition-colors py-1"
+                                                >
+                                                    Mark all read
+                                                </button>
+                                            )}
+                                            <button className="flex-1 text-center text-sm text-primary-400 hover:text-primary-300 transition-colors py-1">
+                                                View all
                                             </button>
                                         </div>
                                     </motion.div>
@@ -193,4 +224,6 @@ export const Header: React.FC = () => {
             </div>
         </header>
     );
-};
+});
+
+Header.displayName = 'Header';

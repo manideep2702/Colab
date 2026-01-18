@@ -1,25 +1,28 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 
-const NeuralBackground: React.FC = () => {
+const NeuralBackground: React.FC = memo(() => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
 
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: true });
         if (!ctx) return;
 
         let animationFrameId: number;
         let particles: Particle[] = [];
-        const particleCount = 100;
-        const connectionDistance = 180;
 
-        // Mouse interaction
+        // Reduced for performance
+        const particleCount = 50; // Reduced from 100
+        const connectionDistance = 150; // Reduced from 180
+        let frameCount = 0;
+
+        // Mouse interaction with throttling
         const mouse = {
             x: undefined as number | undefined,
             y: undefined as number | undefined,
-            radius: 200
+            radius: 150
         };
 
         class Particle {
@@ -33,40 +36,38 @@ const NeuralBackground: React.FC = () => {
             constructor(w: number, h: number) {
                 this.x = Math.random() * w;
                 this.y = Math.random() * h;
-                this.vx = (Math.random() - 0.5) * 0.4;
-                this.vy = (Math.random() - 0.5) * 0.4;
-                this.size = Math.random() * 2 + 0.5;
-                this.color = Math.random() > 0.5 ? '#6366f1' : '#a855f7'; // Primary and secondary colors
+                this.vx = (Math.random() - 0.5) * 0.3; // Slower
+                this.vy = (Math.random() - 0.5) * 0.3;
+                this.size = Math.random() * 1.5 + 0.5;
+                this.color = Math.random() > 0.5 ? '#6366f1' : '#a855f7';
             }
 
             update(w: number, h: number) {
                 this.x += this.vx;
                 this.y += this.vy;
 
-                // Bounce off edges
                 if (this.x < 0 || this.x > w) this.vx *= -1;
                 if (this.y < 0 || this.y > h) this.vy *= -1;
 
-                // Mouse attraction/repulsion
+                // Mouse attraction (simplified)
                 if (mouse.x !== undefined && mouse.y !== undefined) {
                     const dx = mouse.x - this.x;
                     const dy = mouse.y - this.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const distSq = dx * dx + dy * dy; // Avoid sqrt
+                    const radiusSq = mouse.radius * mouse.radius;
 
-                    if (distance < mouse.radius) {
-                        const forceDirectionX = dx / distance;
-                        const forceDirectionY = dy / distance;
-                        const force = (mouse.radius - distance) / mouse.radius;
-
-                        this.vx += forceDirectionX * force * 0.01;
-                        this.vy += forceDirectionY * force * 0.01;
+                    if (distSq < radiusSq) {
+                        const distance = Math.sqrt(distSq);
+                        const force = (mouse.radius - distance) / mouse.radius * 0.008;
+                        this.vx += (dx / distance) * force;
+                        this.vy += (dy / distance) * force;
 
                         // Limit speed
-                        const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-                        const maxSpeed = 1.0;
-                        if (speed > maxSpeed) {
-                            this.vx = (this.vx / speed) * maxSpeed;
-                            this.vy = (this.vy / speed) * maxSpeed;
+                        const speedSq = this.vx * this.vx + this.vy * this.vy;
+                        if (speedSq > 0.64) { // maxSpeed = 0.8
+                            const speed = Math.sqrt(speedSq);
+                            this.vx = (this.vx / speed) * 0.8;
+                            this.vy = (this.vy / speed) * 0.8;
                         }
                     }
                 }
@@ -77,28 +78,37 @@ const NeuralBackground: React.FC = () => {
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
                 ctx.fillStyle = this.color;
-                ctx.globalAlpha = 0.3;
+                ctx.globalAlpha = 0.25;
                 ctx.fill();
-                ctx.globalAlpha = 1;
             }
         }
 
         const resize = () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            const dpr = Math.min(window.devicePixelRatio || 1, 2); // Limit DPR
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+            ctx.scale(dpr, dpr);
             init();
         };
 
         const init = () => {
             particles = [];
             for (let i = 0; i < particleCount; i++) {
-                particles.push(new Particle(canvas.width, canvas.height));
+                particles.push(new Particle(window.innerWidth, window.innerHeight));
             }
         };
 
+        // Throttled mouse handler
+        let lastMouseUpdate = 0;
         const handleMouseMove = (e: MouseEvent) => {
-            mouse.x = e.clientX;
-            mouse.y = e.clientY;
+            const now = Date.now();
+            if (now - lastMouseUpdate > 50) { // Max 20 updates/sec
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+                lastMouseUpdate = now;
+            }
         };
 
         const handleMouseLeave = () => {
@@ -107,38 +117,49 @@ const NeuralBackground: React.FC = () => {
         };
 
         const animate = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            frameCount++;
 
-            for (let i = 0; i < particles.length; i++) {
+            // Skip connection drawing every other frame for performance
+            const drawConnections = frameCount % 2 === 0;
+
+            ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+            const len = particles.length;
+            for (let i = 0; i < len; i++) {
                 const p = particles[i];
-                p.update(canvas.width, canvas.height);
+                p.update(window.innerWidth, window.innerHeight);
                 p.draw();
 
-                for (let j = i + 1; j < particles.length; j++) {
-                    const p2 = particles[j];
-                    const dx = p.x - p2.x;
-                    const dy = p.y - p2.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
+                // Only draw connections every other frame
+                if (drawConnections) {
+                    for (let j = i + 1; j < len; j++) {
+                        const p2 = particles[j];
+                        const dx = p.x - p2.x;
+                        const dy = p.y - p2.y;
+                        const distSq = dx * dx + dy * dy;
+                        const connDistSq = connectionDistance * connectionDistance;
 
-                    if (dist < connectionDistance) {
-                        ctx.beginPath();
-                        ctx.strokeStyle = p.color;
-                        ctx.globalAlpha = (1 - dist / connectionDistance) * 0.25;
-                        ctx.lineWidth = 1.0;
-                        ctx.moveTo(p.x, p.y);
-                        ctx.lineTo(p2.x, p2.y);
-                        ctx.stroke();
-                        ctx.globalAlpha = 1;
+                        if (distSq < connDistSq) {
+                            const dist = Math.sqrt(distSq);
+                            ctx.beginPath();
+                            ctx.strokeStyle = p.color;
+                            ctx.globalAlpha = (1 - dist / connectionDistance) * 0.15;
+                            ctx.lineWidth = 0.5;
+                            ctx.moveTo(p.x, p.y);
+                            ctx.lineTo(p2.x, p2.y);
+                            ctx.stroke();
+                        }
                     }
                 }
             }
+            ctx.globalAlpha = 1;
 
             animationFrameId = requestAnimationFrame(animate);
         };
 
-        window.addEventListener('resize', resize);
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseleave', handleMouseLeave);
+        window.addEventListener('resize', resize, { passive: true });
+        window.addEventListener('mousemove', handleMouseMove, { passive: true });
+        window.addEventListener('mouseleave', handleMouseLeave, { passive: true });
 
         resize();
         animate();
@@ -156,8 +177,12 @@ const NeuralBackground: React.FC = () => {
             ref={canvasRef}
             id="neural-background"
             className="fixed inset-0 -z-10 bg-transparent pointer-events-none"
+            style={{ willChange: 'transform', transform: 'translateZ(0)' }}
         />
     );
-};
+});
+
+NeuralBackground.displayName = 'NeuralBackground';
 
 export default NeuralBackground;
+

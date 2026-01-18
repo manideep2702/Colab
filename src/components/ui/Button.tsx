@@ -1,8 +1,7 @@
-import React from 'react';
-import { motion, type HTMLMotionProps } from 'framer-motion';
+import React, { memo } from 'react';
 import { cn } from '@/lib/utils';
 
-interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'ref'> {
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
@@ -11,7 +10,7 @@ interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'ref'> {
   children: React.ReactNode;
 }
 
-export const Button: React.FC<ButtonProps> = ({
+export const Button: React.FC<ButtonProps> = memo(({
   variant = 'primary',
   size = 'md',
   isLoading = false,
@@ -24,9 +23,11 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   const baseStyles = `
     inline-flex items-center justify-center gap-2
-    font-medium rounded-xl transition-all duration-200
+    font-medium rounded-xl transition-all duration-150 ease-out
     focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900
     disabled:opacity-50 disabled:cursor-not-allowed
+    active:scale-[0.98] hover:scale-[1.02]
+    transform-gpu
   `;
 
   const variants = {
@@ -68,10 +69,8 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   return (
-    <motion.button
-      whileHover={{ scale: disabled ? 1 : 1.02 }}
-      whileTap={{ scale: disabled ? 1 : 0.98 }}
-      className={cn(baseStyles, variants[variant], sizes[size], className)}
+    <button
+      className={cn(baseStyles, variants[variant], sizes[size], disabled && 'hover:scale-100 active:scale-100', className)}
       disabled={disabled || isLoading}
       {...props}
     >
@@ -83,6 +82,9 @@ export const Button: React.FC<ButtonProps> = ({
       ) : leftIcon}
       {children}
       {!isLoading && rightIcon}
-    </motion.button>
+    </button>
   );
-};
+});
+
+Button.displayName = 'Button';
+
