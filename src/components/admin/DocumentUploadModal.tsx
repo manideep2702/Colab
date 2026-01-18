@@ -125,7 +125,14 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         setError('');
 
         try {
-            const json = JSON.parse(jsonText);
+            // Clean up common issues with pasted JSON
+            let cleanedJson = jsonText
+                .replace(/[\u201C\u201D]/g, '"')  // Replace smart double quotes
+                .replace(/[\u2018\u2019]/g, "'")  // Replace smart single quotes
+                .replace(/\t/g, '  ')              // Replace tabs with spaces
+                .trim();
+            
+            const json = JSON.parse(cleanedJson);
 
             if (type === 'assessment') {
                 if (!json.questions || !Array.isArray(json.questions)) {
@@ -168,8 +175,17 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
             setStatus('success');
         } catch (err: any) {
+            console.error('JSON Parse Error:', err);
             if (err instanceof SyntaxError) {
-                setError('Invalid JSON format. Please check your syntax.');
+                // Try to extract position info from error message
+                const posMatch = err.message.match(/position (\d+)/i);
+                if (posMatch) {
+                    const pos = parseInt(posMatch[1]);
+                    const context = jsonText.substring(Math.max(0, pos - 20), pos + 20);
+                    setError(`Invalid JSON at position ${pos}. Near: "...${context}..."`);
+                } else {
+                    setError(`Invalid JSON: ${err.message}`);
+                }
             } else {
                 setError(err.message || 'Failed to parse JSON');
             }
