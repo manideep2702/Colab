@@ -8,6 +8,8 @@ import {
     Sparkles,
     Play,
     CheckCircle2,
+    CheckCircle,
+    XCircle,
     AlertCircle,
     X,
     Loader2,
@@ -1108,10 +1110,12 @@ const QuizTaker = ({
 const ResultsView = ({
     assessment,
     result,
+    studentAnswers,
     onClose
 }: {
     assessment: Assessment;
     result: GradingResult;
+    studentAnswers: Record<string, string>;
     onClose: () => void;
 }) => {
     const passed = result.percentage >= (assessment.passing_score || 70);
@@ -1184,9 +1188,13 @@ const ResultsView = ({
             {/* Question Results */}
             <div>
                 <h3 className="font-medium text-white mb-4">Question Breakdown</h3>
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {result.question_results.map((qr, i) => {
                         const question = assessment.questions?.find(q => q.id === qr.question_id);
+                        const studentAnswer = studentAnswers[qr.question_id];
+                        const correctAnswerIndex = question?.correct_answer ? parseInt(question.correct_answer) : -1;
+                        const studentAnswerIndex = studentAnswer ? parseInt(studentAnswer) : -1;
+                        
                         return (
                             <div key={qr.question_id} className={cn(
                                 "p-4 rounded-xl border",
@@ -1203,8 +1211,58 @@ const ResultsView = ({
                                         {qr.score}/{qr.max_score} pts
                                     </span>
                                 </div>
-                                <p className="text-white text-sm mb-2">{question?.content}</p>
-                                <p className="text-gray-400 text-sm">{qr.feedback}</p>
+                                <p className="text-white text-sm mb-3">{question?.content}</p>
+                                
+                                {/* Options with answer highlighting */}
+                                {question?.options && question.options.length > 0 && (
+                                    <div className="space-y-2 mb-3">
+                                        {question.options.map((option, optIndex) => {
+                                            const isCorrect = optIndex === correctAnswerIndex;
+                                            const isSelected = optIndex === studentAnswerIndex;
+                                            const letter = String.fromCharCode(65 + optIndex); // A, B, C, D
+                                            
+                                            return (
+                                                <div 
+                                                    key={optIndex}
+                                                    className={cn(
+                                                        "flex items-center gap-2 p-2 rounded-lg text-sm",
+                                                        isCorrect && "bg-emerald-500/20 border border-emerald-500/40",
+                                                        isSelected && !isCorrect && "bg-red-500/20 border border-red-500/40",
+                                                        !isCorrect && !isSelected && "bg-white/5"
+                                                    )}
+                                                >
+                                                    <span className={cn(
+                                                        "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+                                                        isCorrect && "bg-emerald-500 text-white",
+                                                        isSelected && !isCorrect && "bg-red-500 text-white",
+                                                        !isCorrect && !isSelected && "bg-white/10 text-gray-400"
+                                                    )}>
+                                                        {letter}
+                                                    </span>
+                                                    <span className={cn(
+                                                        "flex-1",
+                                                        isCorrect && "text-emerald-300",
+                                                        isSelected && !isCorrect && "text-red-300",
+                                                        !isCorrect && !isSelected && "text-gray-400"
+                                                    )}>
+                                                        {option}
+                                                    </span>
+                                                    {isCorrect && (
+                                                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                                                    )}
+                                                    {isSelected && !isCorrect && (
+                                                        <XCircle className="w-4 h-4 text-red-400" />
+                                                    )}
+                                                    {isSelected && (
+                                                        <span className="text-xs text-gray-500 ml-1">Your answer</span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                
+                                <p className="text-gray-400 text-sm italic">{qr.feedback}</p>
                             </div>
                         );
                     })}
@@ -1238,6 +1296,7 @@ export const StudentAssessmentsPage: React.FC = () => {
     const [allChallengeTestCases, setAllChallengeTestCases] = useState<ChallengeTestCase[]>([]);
     const [isLoadingChallenge, setIsLoadingChallenge] = useState(false);
     const [challengeSubmittedNow, setChallengeSubmittedNow] = useState(false);
+    const [submittedAnswers, setSubmittedAnswers] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (user) {
@@ -1344,6 +1403,7 @@ export const StudentAssessmentsPage: React.FC = () => {
 
         setShowQuiz(false);
         setIsGrading(true);
+        setSubmittedAnswers(answers); // Save answers for results view
 
         try {
             // Convert answers to the format expected by Gemini
@@ -1473,6 +1533,7 @@ export const StudentAssessmentsPage: React.FC = () => {
                     <ResultsView
                         assessment={selectedAssessment}
                         result={gradingResult}
+                        studentAnswers={submittedAnswers}
                         onClose={handleCloseResults}
                     />
                 )}
